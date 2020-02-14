@@ -1,4 +1,5 @@
 from Polynomial import Polynomial
+
 class Parabola(Polynomial):
 
     def __init__(self, a,b,c):
