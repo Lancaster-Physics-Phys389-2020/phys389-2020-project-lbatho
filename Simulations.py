@@ -1,14 +1,23 @@
 from abc import ABC, abstractmethod
+from enum import Enum
 
 import scipy as sp
 import numpy as np
-from Particles import Particle
-from Fields import Field
+from Particles import *
+from Fields import *
+
+
+class Approximation(Enum):
+
+    EULER = 'Euler'
+    EULER_CROMER = 'Euler-Cromer'
+    VERLET = 'Verlet'
 
 
 class Simulation(ABC):
 
-    def __init__(self, name = "", tStep = 1, timeLength = 1):
+    def __init__(self, approx : Approximation, name = "", tStep = 1, timeLength = 1):
+        self.approx = approx
         self.name = name
         self.tickLength = int(timeLength / tStep)
         self.tStep = tStep
@@ -23,17 +32,48 @@ class Simulation(ABC):
         pass
 
     def addParticle(self, part : Particle):
-        self.particles[self.nextID[0]] = part
+        ident = self.nextID[0]
+        self.particles[ident] = part
         self.nextID[0] += 1
-        return self.nextID[0] - 1
+        return ident
 
     def addField(self, f : Field):
-        self.fields[self.nextID[1]] = f
+        ident = self.nextID[1]
+        self.fields[ident] = f
         self.nextID[1] += 1
-        return self.nextID[1] - 1
+        return ident
+
+    def getCurrentTime(self):
+        return self.tick * self.tStep
+
+    def getAccel(self, part : Particle):
+        return self.getForce(part) / part.m
+
+    def getForce(self, part : Particle):
+        totalF = np.array([0, 0, 0], float)
+        ex = part.getFields()
+        for f in self.fields:
+            if f not in ex:
+                totalF += f.getForce(part)
+        return totalF
 
 
-class ProtonSimulation(Simulation):
+class SingleProtonSimulation(Simulation):
+
+    def __init__(self, approx : Approximation, tStep = 1, timeLength = 1):
+        super(SingleProtonSimulation, self).__init__(approx, 'Single Proton in Constant Uniform B-Field', tStep, timeLength)
+        ConstantUniformBField(sim = self, fieldVector = np.array([1, 0, 0], float))
+        self.pro = Proton(sim = self)
 
     def start(self):
-        pass
+        for i in range(self.tickLength):
+            self.tick()
+
+    def tick(self):
+        print(self.getCurrentTime(), self.pro.r)
+        for f in self.fields:
+            f.update()
+        for p in self.particles:
+            p.update()
+        for p in self.particles:
+            p.tick()

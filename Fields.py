@@ -28,6 +28,9 @@ class Field(ABC):
     def update(self):
         pass
 
+    def getID(self):
+        return self.id
+
 
 class UniformField(ABC, Field):
 
@@ -48,7 +51,7 @@ class ConstantField(ABC, Field):
 class BField(ABC, Field):
 
     def getForce(self, p : Particle):
-        return p.q * np.cross(p.v, self.getVector(p.x))
+        return p.q * np.cross(p.v, self.getVector(p.r))
 
     def getPotentialEnergy(self, p : Particle):
         pass
@@ -64,10 +67,14 @@ class EField(ABC, Field):
     nor = 1 / (4*const.pi*const.epsilon_0)
 
     def getForce(self, p : Particle):
-        return p.q * self.getVector(self, p.x)
+        return p.q * self.getVector(self, p.r)
+
+    @abstractmethod
+    def getPotential(self, point : np.array) -> float:
+        pass
 
     def getPotentialEnergy(self, p : Particle):
-        return
+        return p.q * self.getPotential(p)
 
 
 class ParticleField(ABC, Field):
@@ -80,10 +87,14 @@ class ParticleField(ABC, Field):
 class ParticleEField(ParticleField, EField):
 
     def getVector(self, point: np.array):
-        r = point - self.source.x
+        r = point - self.source.r
         r2 = np.vdot(r, r)
         rhat = r / np.sqrt(r2)
         return self.source.q * rhat / r2
+
+    def getPotential(self, point : np.array):
+        r = np.linalg.norm(point - self.source.x)
+        return self.source.q / r
 
     def update(self):
         return
