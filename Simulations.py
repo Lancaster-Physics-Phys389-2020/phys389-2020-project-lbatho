@@ -1,17 +1,6 @@
-from abc import ABC, abstractmethod
-from enum import Enum
-
-import scipy as sp
-import numpy as np
-from Particles import *
+from Common import *
 from Fields import *
-
-
-class Approximation(Enum):
-
-    EULER = 'Euler'
-    EULER_CROMER = 'Euler-Cromer'
-    VERLET = 'Verlet'
+from Particles import *
 
 
 class Simulation(ABC):
@@ -19,7 +8,7 @@ class Simulation(ABC):
     def __init__(self, approx : Approximation, name = "", tStep = 1, timeLength = 1):
         self.approx = approx
         self.name = name
-        self.tickLength = int(timeLength / tStep)
+        self.tickLength = int(timeLength / tStep) + 1
         self.tStep = tStep
         self.tick = 0
         self.nextID = (0, 0) # index 0 for particles, index 1 for fields
@@ -32,16 +21,12 @@ class Simulation(ABC):
         pass
 
     def addParticle(self, part : Particle):
-        ident = self.nextID[0]
-        self.particles[ident] = part
-        self.nextID[0] += 1
-        return ident
+        self.particles.append(part)
+        return len(self.particles)
 
     def addField(self, f : Field):
-        ident = self.nextID[1]
-        self.fields[ident] = f
-        self.nextID[1] += 1
-        return ident
+        self.fields.append(f)
+        return len(self.fields)
 
     def getCurrentTime(self):
         return self.tick * self.tStep
@@ -51,29 +36,32 @@ class Simulation(ABC):
 
     def getForce(self, part : Particle):
         totalF = np.array([0, 0, 0], float)
-        ex = part.getFields()
+#        ex = part.getFields()
         for f in self.fields:
-            if f not in ex:
-                totalF += f.getForce(part)
+ #          if f not in ex:
+            totalF += f.getForce(part)
         return totalF
 
 
 class SingleProtonSimulation(Simulation):
 
-    def __init__(self, approx : Approximation, tStep = 1, timeLength = 1):
+    def __init__(self, approx : Approximation, tStep = float(1), timeLength = 1):
         super(SingleProtonSimulation, self).__init__(approx, 'Single Proton in Constant Uniform B-Field', tStep, timeLength)
-        ConstantUniformBField(sim = self, fieldVector = np.array([1, 0, 0], float))
-        self.pro = Proton(sim = self)
+        self.addField(ConstantUniformBField(fieldVector = np.array([0, 0, 1], float)))
+        self.pro = Proton(velocity = np.array([1, 0, 0], float))
+        self.addParticle(self.pro)
 
     def start(self):
         for i in range(self.tickLength):
-            self.tick()
+            print(i)
+            self.tock()
 
-    def tick(self):
+    def tock(self):
         print(self.getCurrentTime(), self.pro.r)
         for f in self.fields:
             f.update()
         for p in self.particles:
-            p.update()
+            p.applyForce(self.getForce(p))
+            p.update(self.tStep, self.approx)
         for p in self.particles:
-            p.tick()
+            p.tock()

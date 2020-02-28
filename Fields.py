@@ -1,16 +1,13 @@
-from abc import ABC, abstractmethod
-
 import numpy as np
 import scipy.constants as const
+from Common import *
 from Particles import Particle
-from Simulations import Simulation
 
 
 class Field(ABC):
 
-    def __init__(self, sim : Simulation, name = ""):
+    def __init__(self, name = ""):
         self.name = name
-        self.id = sim.addField(self)
 
     @abstractmethod
     def getVector(self, point: np.array) -> np.array:
@@ -32,23 +29,23 @@ class Field(ABC):
         return self.id
 
 
-class UniformField(ABC, Field):
+class UniformField(Field):
 
-    def __init__(self, sim : Simulation, name = "", fieldVector = np.array([0, 0, 0], float)):
-        super(UniformField, self).__init__(sim, name)
+    def __init__(self, name = "", fieldVector = np.array([0, 0, 0], float)):
+        super(UniformField, self).__init__(name)
         self.fieldVector = fieldVector
 
     def getVector(self, point: np.array):
         return self.fieldVector
 
 
-class ConstantField(ABC, Field):
+class ConstantField(Field):
 
     def update(self):
         return
 
 
-class BField(ABC, Field):
+class BField(Field):
 
     def getForce(self, p : Particle):
         return p.q * np.cross(p.v, self.getVector(p.r))
@@ -59,10 +56,10 @@ class BField(ABC, Field):
 
 class ConstantUniformBField(UniformField, ConstantField, BField):
 
-    pass
+    def __init__(self, fieldVector : np.array):
+        super(ConstantUniformBField, self).__init__('Constant Uniform B-Field', fieldVector)
 
-
-class EField(ABC, Field):
+class EField(Field):
 
     nor = 1 / (4*const.pi*const.epsilon_0)
 
@@ -77,7 +74,7 @@ class EField(ABC, Field):
         return p.q * self.getPotential(p)
 
 
-class ParticleField(ABC, Field):
+class ParticleField(Field):
 
     def __init__(self, source : Particle, name = ""):
         super(ParticleField, self).__init__(source.getSim(), name)
