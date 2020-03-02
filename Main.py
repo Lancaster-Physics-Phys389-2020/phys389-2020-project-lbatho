@@ -1,9 +1,7 @@
-import numpy as np
-import scipy.constants as const
-
+import Common
 from Simulations import *
 
 print("Hello.")
-print(const.physical_constants['proton mass energy equivalent in MeV'])
-sim = SingleProtonSimulation(approx = Approximation.EULER, timeLength = 10, tStep = 0.1)
+Common.printEnv = False
+sim = SingleProtonSimulation(approx = Approximation.VERLET, timeLength = 100, tStep = 0.001, printStep = 10)
 sim.start()

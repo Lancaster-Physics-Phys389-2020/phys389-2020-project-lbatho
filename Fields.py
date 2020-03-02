@@ -1,5 +1,4 @@
 import numpy as np
-import scipy.constants as const
 from Common import *
 from Particles import Particle
 
@@ -8,6 +7,7 @@ class Field(ABC):
 
     def __init__(self, name = ""):
         self.name = name
+        self.ID = None
 
     @abstractmethod
     def getVector(self, point: np.array) -> np.array:
@@ -24,9 +24,6 @@ class Field(ABC):
     @abstractmethod
     def update(self):
         pass
-
-    def getID(self):
-        return self.id
 
 
 class UniformField(Field):

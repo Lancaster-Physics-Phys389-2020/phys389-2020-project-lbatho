@@ -20,6 +20,7 @@ class Particle:
         self.m = mass
         self.q = charge
         self.name = name
+        self.ID = None
         #self.__partID = sim.addParticle(self)
         #self.__fields = []
         #self.__fieldIDs = []
@@ -32,35 +33,35 @@ class Particle:
         return self.name, self.r, self.v, self.a, self.m, self.q
 
     def __str__(self):
-        return str(self.name + 'at r =' + self.x + 'with v =' + self.v + ', a = ')
-
-    def __copy__(self):
-        pass
+        return self.name + ' ' + str(self.ID) + ' at r = ' + str(self.r) + ' with v = ' + str(self.v) + ', a = ' + str(self.a)
 
     #def getFieldIDs(self):
     #    return self.__fieldIDs
 
     def applyForce(self, force : np.array):
-        print("Force applied! ", force)
+        #print("Force applied! ", force)
         self.aNext = force / self.m
 
     def update(self, tStep, approx):
         if approx == Approximation.EULER:
-            self.rNext = np.add(self.rNext, np.multiply(self.v, tStep))
+            self.rNext += tStep * self.v
             self.vNext += tStep * self.a
         elif approx == Approximation.EULER_CROMER:
             self.vNext += tStep * self.a
             self.rNext += tStep * self.vNext
         elif approx == Approximation.VERLET:
             self.rNext += tStep * (self.v + 0.5*tStep * self.a)
-            self.v += 0.5*tStep*(self.aNext + self.a)
+            self.vNext += 0.5*tStep*(self.aNext + self.a)
         else:
             raise TypeError
 
-    def tock(self):
+    def tick(self):
         self.a = self.aNext
         self.v = self.vNext
         self.r = self.rNext
+
+    def getMomentum(self):
+        return self.m*self.v
 
 
 class Proton(Particle):
@@ -69,7 +70,7 @@ class Proton(Particle):
     charge = 1
 
     def __init__(self,
-                 position = np.array([0, 0, 0]),
+                 position = np.array([0, 0, 0], float),
                  velocity = np.array([0, 0, 0], float),
                  acceleration = np.array([0, 0, 0], float)):
         super(Proton, self).__init__('Proton', position, velocity, acceleration, Proton.mass, Proton.charge)
