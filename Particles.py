@@ -1,3 +1,5 @@
+from copy import copy
+
 import numpy as np
 
 from Common import *
@@ -75,3 +77,53 @@ class Proton(Particle):
                  acceleration = np.array([0, 0, 0], float)):
         super(Proton, self).__init__('Proton', position, velocity, acceleration, Proton.mass, Proton.charge)
 
+
+class Bunch:
+
+    def __init__(self,
+                 part: Particle,
+                 N : int,
+                 R = float(0)):
+        self.N = N
+#        n = N**(1/3)
+#        spacing = 2*R/n
+#        if spacing == 0:
+        self.particles = []
+        for i in range(N):
+            self.particles.append(copy(part))
+
+    def getMomentum(self):
+        mv = np.array([0, 0, 0], float)
+        for i in self.particles:
+            mv += i.getMomentum()
+        return mv
+
+    def getAvgMomentum(self):
+        return self.getMomentum()/self.N
+
+    def getAvgPosition(self):
+        r = np.array([0, 0, 0], float)
+        for i in self.particles:
+            r += i.r
+        return r/self.N
+
+    def getAvgVelocity(self):
+        v = np.array([0, 0, 0], float)
+        for i in self.particles:
+            v += i.v
+        return v/self.N
+
+    def getAvgAcceleration(self):
+        a = np.array([0, 0, 0], float)
+        for i in self.particles:
+            a += i.a
+        return a/self.N
+
+    def getEnergy(self):
+        e = 0
+        for i in self.particles:
+            e += i.getEnergy()
+        return e
+
+    def getAvgEnergy(self):
+        return self.getEnergy()/self.N

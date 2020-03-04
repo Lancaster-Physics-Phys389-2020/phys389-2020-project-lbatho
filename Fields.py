@@ -58,7 +58,7 @@ class ConstantUniformBField(UniformField, ConstantField, BField):
 
 class EField(Field):
 
-    nor = 1 / (4*const.pi*const.epsilon_0)
+    nor = 1 / (4*PI*EPSILON0)
 
     def getForce(self, p : Particle):
         return p.q * self.getVector(self, p.r)

@@ -1,4 +1,5 @@
 from copy import copy
+import textwrap
 import matplotlib.pyplot as plt
 
 from Common import *
@@ -8,9 +9,10 @@ from Particles import *
 
 class Simulation(ABC):
 
-    def __init__(self, approx : Approximation, name = "", tStep = 1, printStep = 1, timeLength = 1):
+    def __init__(self, approx : Approximation, name : str, tStep = 1, printStep = 1, timeLength = 1):
         self.approx = approx
         self.name = name
+        #self.log = Log(type(self).__name__)
         self.tickLength = int(timeLength / tStep) + 1
         self.tStep = tStep
         self.tickPrint = int(printStep / tStep)
@@ -27,15 +29,31 @@ class Simulation(ABC):
     def start(self):
         pass
 
-    def addParticle(self, part : Particle, n = 1):
+#    def addParticles(self, part : Particle, n = 1):
+#        ids = []
+#        for i in range(n):
+#            p = copy(part)
+#            j = len(self.particles)
+#            p.ID = j
+#            self.particles.append(p)
+#            log('Adding ' + p.name + ' with ID ' + str(j), MsgType.ENV)
+#            ids.append(j)
+#        return ids
+
+    def addParticle(self, p : Particle):
+        j = len(self.particles)
+        p.ID = j
+        self.particles.append(p)
+        log('Adding ' + p.name + ' with ID ' + str(j), MsgType.ENV)
+        return j
+
+    def addBunch(self, b : Bunch):
         ids = []
-        for i in range(n):
-            p = copy(part)
-            j = len(self.particles)
-            p.ID = j
-            self.particles.append(p)
-            log('Adding ' + p.name + ' with ID ' + str(j), MsgType.ENV)
-            ids.append(j)
+        log('Adding bunch of ' + str(b.N) + ' particles:', MsgType.ENV)
+        log.indent()
+        for p in b.particles:
+            ids.append(self.addParticle(p))
+        log.unindent()
         return ids
 
     def addField(self, f : Field):
@@ -65,8 +83,8 @@ class Simulation(ABC):
             p.applyForce(self.getForce(p))
             p.update(self.tStep, self.approx)
             if self.currentTick % self.tickPrint == 0:
-                print('Time:', self.getCurrentTime())
-                print(p)
+                log('Time:', self.getCurrentTime())
+                log(p)
             self.xList[p.ID].append(p.r[0])
             self.yList[p.ID].append(p.r[1])
         for p in self.particles:
@@ -80,7 +98,8 @@ class SingleProtonSimulation(Simulation):
         super(SingleProtonSimulation, self).__init__(approx, 'Single Proton in Constant Uniform B-Field', tStep, printStep, timeLength)
         self.addField(ConstantUniformBField(fieldVector = np.array([0, 0, 1000], float)))
         self.pro = Proton(velocity = np.array([1, 0, 0], float))
-        self.addParticle(self.pro)
+        b = Bunch(self.pro, N = 10)
+        self.addBunch(b)
         for p in self.particles:
             self.xList.append([])
             self.yList.append([])
