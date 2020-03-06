@@ -1,18 +1,26 @@
 from copy import copy
-
-import numpy as np
+from typing import Type
 
 from Common import *
 
 
-class Particle:
+class Particle(Trackable):
+
+    class Property(TrackableProperty):
+        ENERGY = 'Energy'
+        MASS = 'Mass'
+        POS = 'Position'
+        VEL = 'Velocity'
+        ACCEL = 'Acceleration'
+        MOMENTUM = 'Momentum'
+        ANGMOMENTUM = 'Angular Momentum'
 
     def __init__(self,
                  name = "",
                  position = np.array([0, 0, 0], float),
                  velocity = np.array([0, 0, 0], float),
                  acceleration = np.array([0, 0, 0], float),
-                 mass = 0, charge = 0):
+                 mass = float(0), charge = float(0)):
         self.r = position
         self.v = velocity
         self.a = acceleration
@@ -22,7 +30,7 @@ class Particle:
         self.m = mass
         self.q = charge
         self.name = name
-        self.ID = None
+        self.ID: int = None
         #self.__partID = sim.addParticle(self)
         #self.__fields = []
         #self.__fieldIDs = []
@@ -31,11 +39,14 @@ class Particle:
         #for f in self.__fields:
         #    self.__fieldIDs.append(f.getID())
 
-    def __repr__(self):
-        return self.name, self.r, self.v, self.a, self.m, self.q
+#    def __repr__(self):
+#        return self.name, self.r, self.v, self.a, self.m, self.q
 
     def __str__(self):
-        return self.name + ' ' + str(self.ID) + ' at r = ' + str(self.r) + ' with v = ' + str(self.v) + ', a = ' + str(self.a)
+        return self.getFullName() + ' at r = ' + str(self.r) + ' with v = ' + str(self.v) + ', a = ' + str(self.a)
+
+    def getFullName(self):
+        return self.name + ' ' + str(self.ID)
 
     #def getFieldIDs(self):
     #    return self.__fieldIDs
@@ -65,6 +76,28 @@ class Particle:
     def getMomentum(self):
         return self.m*self.v
 
+    def getAngMomentum(self):
+        return np.cross(self.r, self.getMomentum())
+
+    def getEnergy(self):
+        return 0.5*self.m*np.vdot(self.v, self.v) # Temp, non-relativistic
+
+    def getProperty(self, p: Property):
+        if p is Particle.Property.ENERGY:
+            return self.getEnergy()
+        if p is Particle.Property.POS:
+            return self.r
+        if p is Particle.Property.VEL:
+            return self.v
+        if p is Particle.Property.ACCEL:
+            return self.a
+        if p is Particle.Property.MASS:
+            return self.m
+        if p is Particle.Property.MOMENTUM:
+            return self.getMomentum()
+        if p is Particle.Property.ANGMOMENTUM:
+            return self.getAngMomentum()
+
 
 class Proton(Particle):
 
@@ -78,19 +111,35 @@ class Proton(Particle):
         super(Proton, self).__init__('Proton', position, velocity, acceleration, Proton.mass, Proton.charge)
 
 
-class Bunch:
+class Bunch(Trackable):
 
-    def __init__(self,
-                 part: Particle,
-                 N : int,
+    class Property(TrackableProperty):
+        ENERGY = 'Total Energy'
+        MASS = 'Mass'
+        POS = 'Central Position'
+        VEL = 'Average Velocity'
+        ACCEL = 'Average Acceleration'
+        MOMENTUM = 'Total Momentum'
+       # MOMENTUM_MAG = 'Total Momentum (mag)'
+        ANGMOMENTUM = 'Total Angular Momentum'
+        AVGENERGY = 'Average Energy'
+        AVGMOMENTUM = 'Average Momentum'
+        AVGANGMOMENTUM = 'Average Angular Momentum'
+
+    def __init__(self, partType: Type[Particle], N: int,
+                 position = np.array([0,0,0], float),
+                 velocity = np.array([0,0,0], float),
+                 acceleration = np.array([0,0,0], float),
                  R = float(0)):
         self.N = N
-#        n = N**(1/3)
-#        spacing = 2*R/n
-#        if spacing == 0:
-        self.particles = []
-        for i in range(N):
+        part = partType(position = position, velocity = velocity, acceleration = acceleration)
+        self.particles: List[Particle] = [part]
+        self.ID = None
+        for i in range(N-1):
             self.particles.append(copy(part))
+
+    def getTypeName(self):
+        return self.particles[0].name
 
     def getMomentum(self):
         mv = np.array([0, 0, 0], float)
@@ -100,6 +149,15 @@ class Bunch:
 
     def getAvgMomentum(self):
         return self.getMomentum()/self.N
+
+    def getAngMomentum(self):
+        tau = np.array([0, 0, 0], float)
+        for i in self.particles:
+            tau += i.getAngMomentum()
+        return tau
+
+    def getAvgAngMomentum(self):
+        return self.getAngMomentum()/self.N
 
     def getAvgPosition(self):
         r = np.array([0, 0, 0], float)
@@ -125,5 +183,41 @@ class Bunch:
             e += i.getEnergy()
         return e
 
+    def getMass(self):
+        m = 0
+        for i in self.particles:
+            m += i.getMass()
+        return m
+
     def getAvgEnergy(self):
         return self.getEnergy()/self.N
+
+    def __str__(self):
+        return self.getFullName() + ' centred at r = ' + str(self.getAvgPosition()) + ' with mv = ' + str(self.getMomentum()) + ', E = ' + str(self.getEnergy())
+
+    def getFullName(self):
+        return 'Bunch ' + str(self.ID)
+
+    def getProperty(self, p: Property):
+        if p is Bunch.Property.ENERGY:
+            return self.getEnergy()
+        if p is Bunch.Property.POS:
+            return self.getAvgPosition()
+        if p is Bunch.Property.VEL:
+            return self.getAvgVelocity()
+        if p is Bunch.Property.ACCEL:
+            return self.getAvgAcceleration()
+        if p is Bunch.Property.MASS:
+            return self.getMass()
+        if p is Bunch.Property.MOMENTUM:
+            return self.getMomentum()
+        if p is Bunch.Property.ANGMOMENTUM:
+            return self.getAngMomentum()
+        if p is Bunch.Property.AVGENERGY:
+            return self.getAvgEnergy()
+        if p is Bunch.Property.AVGMOMENTUM:
+            return self.getAngMomentum()
+        if p is Bunch.Property.AVGANGMOMENTUM:
+            return self.getAvgAngMomentum()
+        else:
+            return None

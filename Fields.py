@@ -1,4 +1,3 @@
-import numpy as np
 from Common import *
 from Particles import Particle
 
@@ -25,8 +24,11 @@ class Field(ABC):
     def update(self):
         pass
 
+    def __str__(self):
+        return self.name
 
-class UniformField(Field):
+
+class UniformField(Field, ABC):
 
     def __init__(self, name = "", fieldVector = np.array([0, 0, 0], float)):
         super(UniformField, self).__init__(name)
@@ -35,14 +37,16 @@ class UniformField(Field):
     def getVector(self, point: np.array):
         return self.fieldVector
 
+    def __str__(self):
+        return self.name + ' with uniform field vector ' + str(self.fieldVector)
 
-class ConstantField(Field):
+class ConstantField(Field, ABC):
 
     def update(self):
         return
 
 
-class BField(Field):
+class BField(Field, ABC):
 
     def getForce(self, p : Particle):
         return p.q * np.cross(p.v, self.getVector(p.r))
@@ -56,7 +60,8 @@ class ConstantUniformBField(UniformField, ConstantField, BField):
     def __init__(self, fieldVector : np.array):
         super(ConstantUniformBField, self).__init__('Constant Uniform B-Field', fieldVector)
 
-class EField(Field):
+
+class EField(Field, ABC):
 
     nor = 1 / (4*PI*EPSILON0)
 
@@ -71,7 +76,7 @@ class EField(Field):
         return p.q * self.getPotential(p)
 
 
-class ParticleField(Field):
+class ParticleField(Field, ABC):
 
     def __init__(self, source : Particle, name = ""):
         super(ParticleField, self).__init__(source.getSim(), name)
@@ -92,3 +97,26 @@ class ParticleEField(ParticleField, EField):
 
     def update(self):
         return
+
+
+class FieldPoint(Trackable):
+
+    class Property(TrackableProperty):
+        VECTOR = 'Field vector'
+        #POTENTIAL = 'Potential'
+
+    def __init__(self, f: Field, r: np.array, name: str):
+        self.field = f
+        self.point = r
+        self.name = name
+
+    def getProperty(self, p: Property):
+        if p is Field.Property.VECTOR:
+            return self.field.getVector(self.point)
+        #elif p == Field.Property.POTENTIAL:
+        #    return self.field.getPoten
+        else:
+            return None
+
+    def getFullName(self):
+        return self.field.getFullName() + ': ' + self.name

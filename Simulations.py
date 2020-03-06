@@ -1,60 +1,69 @@
-from copy import copy
-import textwrap
-import matplotlib.pyplot as plt
-
-from Common import *
 from Fields import *
 from Particles import *
 
 
-class Simulation(ABC):
+class Simulation(Trackable, ABC):
 
-    def __init__(self, approx : Approximation, name : str, tStep = 1, printStep = 1, timeLength = 1):
+    class Property(TrackableProperty):
+        TIME = 'Time'
+        ENERGY = 'Total Energy'
+        MOMENTUM = 'Total Momentum'
+        ANGMOMENTUM = 'Total Angular Momentum'
+
+    def __init__(self, approx : Approximation, name : str, tStep: float, timeLength: float, logStep: float = None):
+        log('Created new sim: ' + name)
+        log.indent()
+        log('Approximation ' + approx.value + ', timestep ' + str(tStep) + ', duration ' + str(timeLength))
         self.approx = approx
         self.name = name
-        #self.log = Log(type(self).__name__)
+        self.simlog = SimLog(self.__class__.__name__)
         self.tickLength = int(timeLength / tStep) + 1
         self.tStep = tStep
-        self.tickPrint = int(printStep / tStep)
+        if logStep is None:
+            log('No logstep set. Defaulting to timestep.')
+            self.tickLog = 1
+        else:
+            self.tickLog = int(timeLength / logStep)
+        self.tickPrint = int(self.tickLength / 20)
         self.currentTick = 0
-        self.nextID = (0, 0) # index 0 for particles, index 1 for fields
-        self.particles = []
-        self.fields = []
-        self.xList = []
-        self.yList = []
-        self.zList = []
+        self.particles: List[Particle] = []
+        self.fields: List[Field] = []
+        self.bunches: List[Bunch] = []
+        log.unindent()
         self.running = False
 
-    @abstractmethod
     def start(self):
+        self.running = True
+        self.simlog.start()
+        for i in range(self.tickLength):
+            self.tick()
+        self.post()
+
+    @abstractmethod
+    def post(self):
         pass
 
-#    def addParticles(self, part : Particle, n = 1):
-#        ids = []
-#        for i in range(n):
-#            p = copy(part)
-#            j = len(self.particles)
-#            p.ID = j
-#            self.particles.append(p)
-#            log('Adding ' + p.name + ' with ID ' + str(j), MsgType.ENV)
-#            ids.append(j)
-#        return ids
-
-    def addParticle(self, p : Particle):
+    def addParticle(self, p: Particle, quiet = False):
         j = len(self.particles)
         p.ID = j
         self.particles.append(p)
-        log('Adding ' + p.name + ' with ID ' + str(j), MsgType.ENV)
+        if not quiet:
+            log('Adding ' + p.name + ' with ID ' + str(j), ProgramLog.MsgType.ENV)
         return j
 
     def addBunch(self, b : Bunch):
         ids = []
-        log('Adding bunch of ' + str(b.N) + ' particles:', MsgType.ENV)
+        j = len(self.bunches)
+        b.ID = j
+        self.bunches.append(b)
+        log('Adding bunch with ID ' + str(j) + ', ' + str(b.N) + ' ' + b.getTypeName() + 's:', ProgramLog.MsgType.ENV)
         log.indent()
         for p in b.particles:
-            ids.append(self.addParticle(p))
+            ids.append(self.addParticle(p, True))
+        l = len(ids)
+        log('Added ' + str(l) + ' particles with IDs in range: (' + str(ids[0]) + ', ' + str(ids[l-1]) + ')')
         log.unindent()
-        return ids
+        return ids, j
 
     def addField(self, f : Field):
         j = len(self.fields)
@@ -65,9 +74,6 @@ class Simulation(ABC):
     def getCurrentTime(self):
         return self.currentTick * self.tStep
 
-    def getAccel(self, part : Particle):
-        return self.getForce(part) / part.m
-
     def getForce(self, part : Particle):
         totalF = np.array([0, 0, 0], float)
 #        ex = part.getFields()
@@ -77,36 +83,69 @@ class Simulation(ABC):
         return totalF
 
     def tick(self):
-        for f in self.fields:
-            f.update()
+        prnt = (self.currentTick % self.tickPrint == 0)
+        lg = (self.currentTick % self.tickLog == 0)
+        if prnt:
+            t = self.getCurrentTime()
+            log(str(np.round(100*self.currentTick/self.tickLength)) + '% done')
         for p in self.particles:
             p.applyForce(self.getForce(p))
             p.update(self.tStep, self.approx)
-            if self.currentTick % self.tickPrint == 0:
-                log('Time:', self.getCurrentTime())
-                log(p)
-            self.xList[p.ID].append(p.r[0])
-            self.yList[p.ID].append(p.r[1])
+        if lg:
+            self.simlog()
         for p in self.particles:
             p.tick()
+        for f in self.fields:
+            f.update()
         self.currentTick += 1
+
+    def getTotalEnergy(self):
+        e = float(0)
+        for p in self.particles:
+            e += p.getEnergy() #+ p.getPotentialEnergy()
+        return e
+
+    def getTotalMomentum(self):
+        mv = np.array([0,0,0], float)
+        for p in self.particles:
+            mv += p.getMomentum()
+        return mv
+
+    def getTotalAngMomentum(self):
+        tau = np.array([0,0,0], float)
+        for p in self.particles:
+            tau += p.getAngMomentum()
+        return tau
+
+    def getFullName(self):
+        return 'System'
+
+    def getProperty(self, p: Property):
+        if p is Simulation.Property.TIME:
+            return self.getCurrentTime()
+        if p is Simulation.Property.ENERGY:
+            return self.getTotalEnergy()
+        if p is Simulation.Property.MOMENTUM:
+            return self.getTotalMomentum()
+        if p is Simulation.Property.ANGMOMENTUM:
+            return self.getTotalAngMomentum()
+        else:
+            return None
 
 
 class SingleProtonSimulation(Simulation):
 
-    def __init__(self, approx : Approximation, tStep = float(1), printStep = float(1), timeLength = 1):
-        super(SingleProtonSimulation, self).__init__(approx, 'Single Proton in Constant Uniform B-Field', tStep, printStep, timeLength)
+    def __init__(self, approx : Approximation, tStep = float(1), timeLength = float(1)):
+        super(SingleProtonSimulation, self).__init__(approx = approx, name = 'Single Proton in Constant Uniform B-Field',
+                                                     tStep = tStep, timeLength =  timeLength)
         self.addField(ConstantUniformBField(fieldVector = np.array([0, 0, 1000], float)))
-        self.pro = Proton(velocity = np.array([1, 0, 0], float))
-        b = Bunch(self.pro, N = 10)
+        b = Bunch(partType = Proton, N = 10, velocity = np.array([1, 0, 0], float))
         self.addBunch(b)
-        for p in self.particles:
-            self.xList.append([])
-            self.yList.append([])
+        self.simlog.track(self, Simulation.Property.TIME, Simulation.Property.ENERGY)
+        self.simlog.track(b, Bunch.Property.ENERGY)
 
-    def start(self):
-        for i in range(self.tickLength):
-            self.tick()
-        print(self.xList)
-        plt.plot(self.xList[0], self.yList[0])
-        plt.show()
+    def post(self):
+        print('Done')
+        #print(self.xList)
+        #plt.plot(self.xList[0], self.yList[0])
+        #plt.show()
