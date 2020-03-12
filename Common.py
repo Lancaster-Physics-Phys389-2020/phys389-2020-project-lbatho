@@ -5,7 +5,11 @@ from enum import Enum
 from pathlib import Path
 from typing import List
 
+import numpy as np
 import scipy.constants as const
+
+START_TIME = datetime.now()
+START_TIME_STR = START_TIME.strftime('%Y-%m-%d_%H-%M-%S')
 
 PI = const.pi
 EPSILON0 = const.epsilon_0
@@ -17,6 +21,77 @@ class Approximation(Enum):
     EULER_CROMER = 'Euler-Cromer'
     VERLET = 'Verlet'
 
+
+class Axis(Enum):
+    X = 0
+    Y = 1
+    Z = 2
+
+
+class Region(ABC):
+
+    @abstractmethod
+    def contains(self, point: np.array) -> bool:
+        pass
+
+
+class AllRegion(Region):
+
+    def contains(self, point: np.array):
+        return True
+
+
+ALL_SPACE: Region = AllRegion()
+
+
+class CubeRegion(Region):
+
+    def __init__(self, boundA: np.array, boundB: np.array):
+        if boundA[0] < boundB[0]:
+            self.x1 = boundA[0]
+            self.x2 = boundB[0]
+        else:
+            self.x1 = boundB[0]
+            self.x2 = boundA[0]
+        if boundA[1] < boundB[1]:
+            self.y1 = boundA[1]
+            self.y2 = boundB[1]
+        else:
+            self.y1 = boundB[1]
+            self.y2 = boundA[1]
+        if boundA[2] < boundB[2]:
+            self.z1 = boundA[2]
+            self.z2 = boundB[2]
+        else:
+            self.z1 = boundB[2]
+            self.z2 = boundA[2]
+
+    def contains(self, point: np.array):
+        x = point[0]
+        y = point[1]
+        z = point[2]
+        if (point[0] >= self.x1) and (point[0] <= self.x2) and (point[1] >= self.y1) and (point[1] <= self.y2) and (point[2] >= self.z1) and (point[2] <= self.z2):
+            return True
+        else:
+            return False
+
+
+class AxisRegion(Region):
+
+    def __init__(self, boundA: float, boundB: float, axis: Axis):
+        if boundA < boundB:
+            self.b1 = boundA
+            self.b2 = boundB
+        else:
+            self.b1 = boundB
+            self.b2 = boundA
+        self.axis:Axis = axis
+
+    def contains(self, point: np.array):
+        if (point[self.axis.value] >= self.b1) and (point[self.axis.value] <= self.b2):
+            return True
+        else:
+            return False
 
 class TrackableProperty(Enum):
     pass
@@ -37,7 +112,7 @@ class SimLog:
 
     def __init__(self, name: str):
         self.name = name
-        self.file = open(name + ".csv", 'w', newline = '')
+        self.file = open(name + '_' + START_TIME_STR + '.csv', 'w', newline = '')
         self.columns = []
         self.out: csv.DictWriter = None
         self.logging = False
@@ -72,12 +147,6 @@ class ProgramLog:
         PART = 'Particle'
         FIELD = 'Field'
         BUNCH = 'Bunch'
-
-    @classmethod
-    def makeLog(cls):
-        d = datetime.now()
-        s = d.strftime('%Y-%m-%d_%H-%M-%S')
-        return ProgramLog(s)
 
     def __init__(self, name = 'log', logPrint = True, logEnv = True, logPart = True,
                  logField = False, logBunch = True):
@@ -116,5 +185,5 @@ class ProgramLog:
         self.currentIndent = 0
 
 
-log = ProgramLog.makeLog()
+log = ProgramLog(START_TIME_STR)
 

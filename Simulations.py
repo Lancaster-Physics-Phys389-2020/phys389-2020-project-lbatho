@@ -61,7 +61,7 @@ class Simulation(Trackable, ABC):
         for p in b.particles:
             ids.append(self.addParticle(p, True))
         l = len(ids)
-        log('Added ' + str(l) + ' particles with IDs in range: (' + str(ids[0]) + ', ' + str(ids[l-1]) + ')')
+        log('Added ' + str(l) + ' particles with IDs in range: (' + str(ids[0]) + ', ' + str(ids[l-1]) + ')', ProgramLog.MsgType.ENV)
         log.unindent()
         return ids, j
 
@@ -69,6 +69,7 @@ class Simulation(Trackable, ABC):
         j = len(self.fields)
         f.ID = j
         self.fields.append(f)
+        log('Added ' + str(f) + ' with ID ' + str(j), ProgramLog.MsgType.ENV)
         return j
 
     def getCurrentTime(self):
@@ -97,6 +98,7 @@ class Simulation(Trackable, ABC):
             p.tick()
         for f in self.fields:
             f.update()
+            f.tick()
         self.currentTick += 1
 
     def getTotalEnergy(self):
@@ -139,10 +141,10 @@ class SingleProtonSimulation(Simulation):
         super(SingleProtonSimulation, self).__init__(approx = approx, name = 'Single Proton in Constant Uniform B-Field',
                                                      tStep = tStep, timeLength =  timeLength)
         self.addField(ConstantUniformBField(fieldVector = np.array([0, 0, 1000], float)))
-        b = Bunch(partType = Proton, N = 10, velocity = np.array([1, 0, 0], float))
-        self.addBunch(b)
-        self.simlog.track(self, Simulation.Property.TIME, Simulation.Property.ENERGY)
-        self.simlog.track(b, Bunch.Property.ENERGY)
+        pro = Proton()
+        self.addParticle(pro)
+        self.simlog.track(self, Simulation.Property.TIME, Simulation.Property.ENERGY, Simulation.Property.MOMENTUM, Simulation.Property.ANGMOMENTUM)
+        self.simlog.track(pro, Particle.Property.POS)
 
     def post(self):
         print('Done')
