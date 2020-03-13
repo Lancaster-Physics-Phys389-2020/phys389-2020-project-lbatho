@@ -1,3 +1,4 @@
+from Common import *
 from Fields import *
 from Particles import *
 
@@ -23,7 +24,7 @@ class Simulation(Trackable, ABC):
             log('No logstep set. Defaulting to timestep.')
             self.tickLog = 1
         else:
-            self.tickLog = int(timeLength / logStep)
+            self.tickLog = int(logStep / tStep)
         self.tickPrint = int(self.tickLength / 20)
         self.currentTick = 0
         self.particles: List[Particle] = []
@@ -138,11 +139,11 @@ class Simulation(Trackable, ABC):
 
 class SingleProtonSimulation(Simulation):
 
-    def __init__(self, approx : Approximation, tStep = float(1), timeLength = float(1)):
+    def __init__(self, approx : Approximation, tStep: float, timeLength: float, logStep: float = None):
         super(SingleProtonSimulation, self).__init__(approx = approx, name = 'Single Proton in Constant Uniform B-Field',
-                                                     tStep = tStep, timeLength =  timeLength)
-        self.addField(ConstantUniformBField(fieldVector = np.array([0, 0, 1000], float)))
-        pro = Proton()
+                                                     tStep = tStep, timeLength =  timeLength, logStep = logStep)
+        #self.addField(ConstantUniformBField(fieldVector = np.array([0, 0, 1000], float)))
+        pro = Proton(velocity = np.array([1,0,0], float))
         self.addParticle(pro)
         self.simlog.track(self, Simulation.Property.TIME, Simulation.Property.ENERGY, Simulation.Property.MOMENTUM, Simulation.Property.ANGMOMENTUM)
         self.simlog.track(pro, Particle.Property.POS)
@@ -150,15 +151,16 @@ class SingleProtonSimulation(Simulation):
     def post(self):
         print('Done')
         self.simlog.save()
-        #print(self.xList)
-        #plt.plot(self.xList[0], self.yList[0])
-        #plt.show()
+        df = self.simlog.getData()
+        x, y, z = SimLog.splitArray(df['Proton 0: Position'])
+        plt.plot(x, y)
+        plt.show()
 
 
 class CyclotronSimulation(Simulation):
 
     def __init__(self, approx: Approximation, tStep: float, timeLength: float, logStep: float = None,
-                 part: Type[Particle] = Proton, nBunch: int = 1, nPerBunch: int = 100):
+                 part: Type[Particle] = Proton, nBunch: int = 1, nPerBunch: int = 10):
         super(CyclotronSimulation, self).__init__(approx = approx, tStep = tStep, timeLength = timeLength,
                                                   logStep = logStep, name = part.__name__ + ' Cyclotron')
         self.simlog.track(self, Simulation.Property.TIME)
@@ -169,7 +171,7 @@ class CyclotronSimulation(Simulation):
         bf = ConstantUniformBField(np.array([0,0,1000]))
         self.addField(bf)
         r = AxisRegion(-5, 5, Axis.X)
-        c = CyclotronEField(fieldVector = np.array([1,0,0], float), partType = part, bField = bf, tStep = tStep, region = r)
+        c = CyclotronEField(fieldVector = np.array([1000,0,0], float), partType = part, bField = bf, tStep = tStep, region = r)
         self.addField(c)
 
     def post(self):

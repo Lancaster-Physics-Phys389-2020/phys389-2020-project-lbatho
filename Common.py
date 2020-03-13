@@ -3,10 +3,11 @@ from abc import ABC, abstractmethod
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
-from typing import List
+from typing import List, Type
 
 import numpy as np
 import scipy.constants as const
+import matplotlib.pyplot as plt
 from pandas import DataFrame
 
 START_TIME = datetime.now()
@@ -97,7 +98,6 @@ class AxisRegion(Region):
 
 
 class TrackableProperty(Enum):
-    pass
 
     def isVector(self):
         return self.value[1]

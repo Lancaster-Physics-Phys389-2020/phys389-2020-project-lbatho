@@ -113,7 +113,6 @@ class StepOscillatingField(OscillatingField, ABC):
     def __init__(self, maxFieldVector: np.array, period: float, tStep: float, region: Region = ALL_SPACE, name = ""):
         super(StepOscillatingField, self).__init__(maxFieldVector = maxFieldVector, period = period,
                                                    tStep = tStep, region = region, name = name)
-        print(period)
         self.halfPeriod = period / 2
 
     def tick(self):

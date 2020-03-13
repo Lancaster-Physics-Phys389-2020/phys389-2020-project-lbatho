@@ -1,4 +1,4 @@
-from copy import copy
+from copy import deepcopy
 
 from Common import *
 
@@ -146,7 +146,7 @@ class Bunch(Trackable):
         self.particles: List[Particle] = [part]
         self.ID = None
         for i in range(N-1):
-            self.particles.append(copy(part))
+            self.particles.append(deepcopy(part))
 
     def getTypeName(self):
         return self.particles[0].name
