@@ -12,6 +12,9 @@ class Field(ABC):
     def getVector(self, point: np.array) -> np.array:
         pass
 
+    def getMagnitude(self, point: np.array) -> float:
+        return np.linalg.norm(self.getVector(point))
+
     @abstractmethod
     def getForce(self, p: Particle) -> np.array:
         pass
@@ -89,7 +92,7 @@ class OscillatingField(UniformField, ABC):
         super(OscillatingField, self).__init__(fieldVector = maxFieldVector, region = region, name = name)
         self.period = period
         self.tStep = tStep
-        self.t: float = 0
+        self.t = float(0)
 
     def tick(self):
         if self.t > self.period:
@@ -101,12 +104,16 @@ class OscillatingField(UniformField, ABC):
     def update(self):
         pass
 
+    def __str__(self):
+        return self.name + ' with uniform field vector ' + str(self.fieldVector) + ' and period ' + str(self.period)
+
 
 class StepOscillatingField(OscillatingField, ABC):
 
     def __init__(self, maxFieldVector: np.array, period: float, tStep: float, region: Region = ALL_SPACE, name = ""):
         super(StepOscillatingField, self).__init__(maxFieldVector = maxFieldVector, period = period,
                                                    tStep = tStep, region = region, name = name)
+        print(period)
         self.halfPeriod = period / 2
 
     def tick(self):
@@ -122,9 +129,15 @@ class StepOscillatingField(OscillatingField, ABC):
 
 class CyclotronEField(StepOscillatingField, EField):
 
-    def __init__(self, fieldVector: np.array, period: float, tStep: float, region: Region = ALL_SPACE, name = ""):
+    @classmethod
+    def getResonanceT(cls, partType: Type[Particle], bField: ConstantUniformBField):
+        return 2*PI*partType.getRestMass() / (partType.getCharge()*np.linalg.norm(bField.fieldVector))
+
+    def __init__(self, fieldVector: np.array, partType: Type[Particle], bField: ConstantUniformBField,
+                 tStep: float, region: Region = ALL_SPACE):
+        period = self.getResonanceT(partType = partType, bField = bField)
         super(CyclotronEField, self).__init__(maxFieldVector = fieldVector, period = period,
-                                              tStep = tStep, region = region, name = name)
+                                              tStep = tStep, region = region, name = 'Cyclotronic E-Field')
 
     def getPotential(self, point: np.array):
         pass
@@ -152,7 +165,7 @@ class ParticleEField(ParticleField, EField, ConstantField):
 
 class FieldPoint(Trackable):
     class Property(TrackableProperty):
-        VECTOR = 'Field vector'
+        VECTOR = 'Field vector', True
         # POTENTIAL = 'Potential'
 
     def __init__(self, f: Field, r: np.array, name: str):

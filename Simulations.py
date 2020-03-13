@@ -5,10 +5,10 @@ from Particles import *
 class Simulation(Trackable, ABC):
 
     class Property(TrackableProperty):
-        TIME = 'Time'
-        ENERGY = 'Total Energy'
-        MOMENTUM = 'Total Momentum'
-        ANGMOMENTUM = 'Total Angular Momentum'
+        TIME = 'Time', False
+        ENERGY = 'Total Energy', False
+        MOMENTUM = 'Total Momentum', False
+        ANGMOMENTUM = 'Total Angular Momentum', False
 
     def __init__(self, approx : Approximation, name : str, tStep: float, timeLength: float, logStep: float = None):
         log('Created new sim: ' + name)
@@ -37,6 +37,7 @@ class Simulation(Trackable, ABC):
         self.simlog.start()
         for i in range(self.tickLength):
             self.tick()
+        log('Done in ' + str((datetime.now() - START_TIME).total_seconds()) + 's')
         self.post()
 
     @abstractmethod
@@ -88,7 +89,7 @@ class Simulation(Trackable, ABC):
         lg = (self.currentTick % self.tickLog == 0)
         if prnt:
             t = self.getCurrentTime()
-            log(str(np.round(100*self.currentTick/self.tickLength)) + '% done')
+            print(str(np.round(100*self.currentTick/self.tickLength)) + '% done')
         for p in self.particles:
             p.applyForce(self.getForce(p))
             p.update(self.tStep, self.approx)
@@ -148,6 +149,32 @@ class SingleProtonSimulation(Simulation):
 
     def post(self):
         print('Done')
+        self.simlog.save()
         #print(self.xList)
         #plt.plot(self.xList[0], self.yList[0])
         #plt.show()
+
+
+class CyclotronSimulation(Simulation):
+
+    def __init__(self, approx: Approximation, tStep: float, timeLength: float, logStep: float = None,
+                 part: Type[Particle] = Proton, nBunch: int = 1, nPerBunch: int = 100):
+        super(CyclotronSimulation, self).__init__(approx = approx, tStep = tStep, timeLength = timeLength,
+                                                  logStep = logStep, name = part.__name__ + ' Cyclotron')
+        self.simlog.track(self, Simulation.Property.TIME)
+        for i in range(nBunch):
+            b = Bunch(partType = part, N = nPerBunch, velocity = np.array([1,0,0], float))
+            self.addBunch(b)
+            self.simlog.track(b, Bunch.Property.POS)
+        bf = ConstantUniformBField(np.array([0,0,1000]))
+        self.addField(bf)
+        r = AxisRegion(-5, 5, Axis.X)
+        c = CyclotronEField(fieldVector = np.array([1,0,0], float), partType = part, bField = bf, tStep = tStep, region = r)
+        self.addField(c)
+
+    def post(self):
+        self.simlog.save()
+        df = self.simlog.getData()
+        x, y, z = SimLog.splitArray(df['Bunch 0: Central Position'])
+        plt.plot(x, y)
+        plt.show()

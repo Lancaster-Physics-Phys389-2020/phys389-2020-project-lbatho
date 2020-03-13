@@ -1,4 +1,4 @@
-import csv
+import pickle
 from abc import ABC, abstractmethod
 from datetime import datetime
 from enum import Enum
@@ -7,6 +7,7 @@ from typing import List
 
 import numpy as np
 import scipy.constants as const
+from pandas import DataFrame
 
 START_TIME = datetime.now()
 START_TIME_STR = START_TIME.strftime('%Y-%m-%d_%H-%M-%S')
@@ -70,7 +71,8 @@ class CubeRegion(Region):
         x = point[0]
         y = point[1]
         z = point[2]
-        if (point[0] >= self.x1) and (point[0] <= self.x2) and (point[1] >= self.y1) and (point[1] <= self.y2) and (point[2] >= self.z1) and (point[2] <= self.z2):
+        if (point[0] >= self.x1) and (point[0] <= self.x2) and (point[1] >= self.y1) and (point[1] <= self.y2) and (
+                point[2] >= self.z1) and (point[2] <= self.z2):
             return True
         else:
             return False
@@ -85,7 +87,7 @@ class AxisRegion(Region):
         else:
             self.b1 = boundB
             self.b2 = boundA
-        self.axis:Axis = axis
+        self.axis: Axis = axis
 
     def contains(self, point: np.array):
         if (point[self.axis.value] >= self.b1) and (point[self.axis.value] <= self.b2):
@@ -93,8 +95,15 @@ class AxisRegion(Region):
         else:
             return False
 
+
 class TrackableProperty(Enum):
     pass
+
+    def isVector(self):
+        return self.value[1]
+
+    def __str__(self):
+        return self.value[0]
 
 
 class Trackable(ABC):
@@ -110,37 +119,89 @@ class Trackable(ABC):
 
 class SimLog:
 
+    @classmethod
+    def splitArray(cls, column):
+        x = []
+        y = []
+        z = []
+        for i in column:
+            x.append(i[0])
+            y.append(i[1])
+            z.append(i[2])
+        return x, y, z
+
     def __init__(self, name: str):
         self.name = name
-        self.file = open(name + '_' + START_TIME_STR + '.csv', 'w', newline = '')
+        # self.file = open(name + '_' + START_TIME_STR + '.csv', 'w', newline = '')
         self.columns = []
-        self.out: csv.DictWriter = None
+        # self.out: csv.DictWriter = None
         self.logging = False
         self.tracked: List[Trackable] = []
+        self.rows: List[dict] = []
 
     def start(self):
         self.logging = True
-        self.out = csv.DictWriter(self.file, fieldnames = self.columns)
-        self.out.writeheader()
+        # self.out = csv.DictWriter(self.file, fieldnames = self.columns)
+        # self.out.writeheader()
 
     def track(self, t: Trackable, *trackedProperties: TrackableProperty):
         self.tracked.append((t, trackedProperties))
         for i in trackedProperties:
-            self.columns.append(t.getFullName() + ': ' + i.value)
+            self.columns.append(t.getFullName() + ': ' + str(i))
 
     def log(self):
         dic = {}
         for t in self.tracked:
             for i in t[1]:
-                dic.update({(t[0].getFullName() + ': ' + i.value): t[0].getProperty(i)})
-        self.out.writerow(dic)
+                dic.update({(t[0].getFullName() + ': ' + str(i)): t[0].getProperty(i)})
+        # self.out.writerow(dic)
+        # self.file.flush()
+        self.rows.append(dic)
+
+    def getData(self):
+        return DataFrame(self.rows)
+
+    def save(self, filename: str = None):
+        if filename is None:
+            file = self.name + '_' + START_TIME_STR + '.pickle'
+        else:
+            file = filename
+        log('Pickling simulation data to ' + file + '... ', endLine = False)
+        with open(file, 'wb') as f:
+            pickle.dump(self, f)
+        print('done')
+
+    def saveToCSV(self, filename: str = None):
+        if filename is None:
+            file = self.name + '_' + START_TIME_STR + '.csv'
+        else:
+            file = filename
+        log('Dumping simulation data as CSV to ' + file + '... ', endLine = False)
+        df: DataFrame = self.getData()
+        vec = False
+        for k, v in self.rows[0].items():
+            if isinstance(v, np.ndarray):
+                vec = True
+                break
+        if not vec:
+            return df
+        else:
+            dic = {}
+            for d in list(df):
+                if isinstance(df[d][0], np.ndarray):
+                    x, y, z = self.splitArray(df[d])
+                    dic.update({(d + ' - x'): x, (d + ' - y'): y, (d + ' - z'): z})
+                else:
+                    dic.update({d: df[d]})
+            newdf = DataFrame(dic)
+            newdf.to_csv(path_or_buf = file)
+        log('done')
 
     def __call__(self):
         self.log()
 
 
 class ProgramLog:
-
     class MsgType(Enum):
         PRINT = 'Print'
         ENV = 'Environment'
@@ -157,25 +218,31 @@ class ProgramLog:
         self.fname = 'logs/' + name + '.log'
         self.out = open(self.fname, 'w')
 
-    def __call__(self, s, msgtype = MsgType.PRINT):
-        self.log(s, msgtype)
+    def __call__(self, s, msgtype = MsgType.PRINT, endLine = True):
+        self.log(s, msgtype, endLine)
 
-    def log(self, s, msgtype = MsgType.PRINT):
+    def log(self, s, msgtype = MsgType.PRINT, endLine = True):
         if self.dicLog.get(msgtype):
-            self.print(s)
-            self.write(s)
+            self.print(s, endLine)
+            self.write(s, endLine)
 
-    def print(self, s):
+    def print(self, s, endLine = True):
         i = ''
         for j in range(self.currentIndent):
             i += '\t'
-        print(i + str(s))
+        if endLine:
+            print(i + str(s))
+        else:
+            print(i + str(s), end = '')
 
-    def write(self, s):
+    def write(self, s, endLine = True):
         i = ''
         for j in range(self.currentIndent):
             i += '\t'
-        self.out.write(i + str(s) + '\n')
+        if endLine:
+            self.out.write(i + str(s) + '\n')
+        else:
+            self.out.write(i + str(s))
         self.out.flush()
 
     def indent(self, i: int = 1):
@@ -186,4 +253,3 @@ class ProgramLog:
 
 
 log = ProgramLog(START_TIME_STR)
-

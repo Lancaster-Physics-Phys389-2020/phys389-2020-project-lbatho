@@ -1,19 +1,18 @@
 from copy import copy
-from typing import Type
 
 from Common import *
 
 
-class Particle(Trackable):
+class Particle(Trackable, ABC):
 
     class Property(TrackableProperty):
-        ENERGY = 'Energy'
-        MASS = 'Mass'
-        POS = 'Position'
-        VEL = 'Velocity'
-        ACCEL = 'Acceleration'
-        MOMENTUM = 'Momentum'
-        ANGMOMENTUM = 'Angular Momentum'
+        ENERGY = 'Energy', False
+        MASS = 'Mass', False
+        POS = 'Position', True
+        VEL = 'Velocity', True
+        ACCEL = 'Acceleration', True
+        MOMENTUM = 'Momentum', True
+        ANGMOMENTUM = 'Angular Momentum', True
 
     def __init__(self,
                  name = "",
@@ -31,13 +30,6 @@ class Particle(Trackable):
         self.q = charge
         self.name = name
         self.ID: int = None
-        #self.__partID = sim.addParticle(self)
-        #self.__fields = []
-        #self.__fieldIDs = []
-        #if charge != 0:
-        #    self.__fields.append(ParticleEField(self))
-        #for f in self.__fields:
-        #    self.__fieldIDs.append(f.getID())
 
 #    def __repr__(self):
 #        return self.name, self.r, self.v, self.a, self.m, self.q
@@ -82,6 +74,16 @@ class Particle(Trackable):
     def getEnergy(self):
         return 0.5*self.m*np.vdot(self.v, self.v) # Temp, non-relativistic
 
+    @classmethod
+    @abstractmethod
+    def getRestMass(cls):
+        pass
+
+    @classmethod
+    @abstractmethod
+    def getCharge(cls):
+        pass
+
     def getProperty(self, p: Property):
         if p is Particle.Property.ENERGY:
             return self.getEnergy()
@@ -101,30 +103,38 @@ class Particle(Trackable):
 
 class Proton(Particle):
 
-    mass = 938 # Temp value
-    charge = 1
+    REST_MASS = 938 # Temp value
+    CHARGE = 1
 
     def __init__(self,
                  position = np.array([0, 0, 0], float),
                  velocity = np.array([0, 0, 0], float),
                  acceleration = np.array([0, 0, 0], float)):
-        super(Proton, self).__init__('Proton', position, velocity, acceleration, Proton.mass, Proton.charge)
+        super(Proton, self).__init__('Proton', position, velocity, acceleration, Proton.REST_MASS, Proton.CHARGE)
+
+    @classmethod
+    def getRestMass(cls):
+        return cls.REST_MASS
+
+    @classmethod
+    def getCharge(cls):
+        return cls.CHARGE
 
 
 class Bunch(Trackable):
 
     class Property(TrackableProperty):
-        ENERGY = 'Total Energy'
-        MASS = 'Mass'
-        POS = 'Central Position'
-        VEL = 'Average Velocity'
-        ACCEL = 'Average Acceleration'
-        MOMENTUM = 'Total Momentum'
+        ENERGY = 'Total Energy', False
+        MASS = 'Mass', False
+        POS = 'Central Position', True
+        VEL = 'Average Velocity', True
+        ACCEL = 'Average Acceleration', True
+        MOMENTUM = 'Total Momentum', True
        # MOMENTUM_MAG = 'Total Momentum (mag)'
-        ANGMOMENTUM = 'Total Angular Momentum'
-        AVGENERGY = 'Average Energy'
-        AVGMOMENTUM = 'Average Momentum'
-        AVGANGMOMENTUM = 'Average Angular Momentum'
+        ANGMOMENTUM = 'Total Angular Momentum', True
+        AVGENERGY = 'Average Energy', False
+        AVGMOMENTUM = 'Average Momentum', True
+        AVGANGMOMENTUM = 'Average Angular Momentum', True
 
     def __init__(self, partType: Type[Particle], N: int,
                  position = np.array([0,0,0], float),
