@@ -4,9 +4,17 @@ from Particles import Particle
 
 class Field(ABC):
 
-    def __init__(self, name = ""):
-        self.name = name
+    FIELDTYPE = ''
+
+    def __init__(self, name = None):
+        if name is None:
+            self.name = self.getTypeName()
+        else:
+            self.name = name
         self.ID = None
+
+    def getTypeName(self):
+        return self.__class__.FIELDTYPE
 
     @abstractmethod
     def getVector(self, point: np.array) -> np.array:
@@ -33,6 +41,8 @@ class Field(ABC):
 
 class UniformField(Field, ABC):
 
+    FIELDTYPE = 'Uniform Field'
+
     def __init__(self, fieldVector: np.array, region: Region = ALL_SPACE, name = ""):
         super(UniformField, self).__init__(name)
         self.fieldVector = fieldVector
@@ -50,6 +60,8 @@ class UniformField(Field, ABC):
 
 class ConstantField(Field, ABC):
 
+    FIELDTYPE = 'Constant Field'
+
     def update(self):
         return
 
@@ -58,6 +70,8 @@ class ConstantField(Field, ABC):
 
 
 class BField(Field, ABC):
+
+    FIELDTYPE = 'Magnetic Field'
 
     def getForce(self, p: Particle):
         return p.q * np.cross(p.v, self.getVector(p.r))
@@ -68,11 +82,16 @@ class BField(Field, ABC):
 
 class ConstantUniformBField(UniformField, ConstantField, BField):
 
-    def __init__(self, fieldVector: np.array, region: Region = ALL_SPACE):
-        super(ConstantUniformBField, self).__init__(name = 'Constant Uniform B-Field', fieldVector = fieldVector, region = region)
+    FIELDTYPE = 'Constant Uniform B-Field'
+
+    def __init__(self, fieldVector: np.array, region: Region = ALL_SPACE, name = None):
+        super(ConstantUniformBField, self).__init__(name = name, fieldVector = fieldVector, region = region)
 
 
 class EField(Field, ABC):
+
+    FIELDTYPE = 'Electric Field'
+
     nor = 1 / (4 * PI * EPSILON0)
 
     def getForce(self, p: Particle):
@@ -87,6 +106,8 @@ class EField(Field, ABC):
 
 
 class OscillatingField(UniformField, ABC):
+
+    FIELDTYPE = 'Oscillating Field'
 
     def __init__(self, maxFieldVector: np.array, period: float, tStep: float, region: Region = ALL_SPACE, name = ""):
         super(OscillatingField, self).__init__(fieldVector = maxFieldVector, region = region, name = name)
@@ -110,6 +131,8 @@ class OscillatingField(UniformField, ABC):
 
 class StepOscillatingField(OscillatingField, ABC):
 
+    FIELDTYPE = 'Step-Function Oscillating Field'
+
     def __init__(self, maxFieldVector: np.array, period: float, tStep: float, region: Region = ALL_SPACE, name = ""):
         super(StepOscillatingField, self).__init__(maxFieldVector = maxFieldVector, period = period,
                                                    tStep = tStep, region = region, name = name)
@@ -128,6 +151,8 @@ class StepOscillatingField(OscillatingField, ABC):
 
 class CyclotronEField(StepOscillatingField, EField):
 
+    FIELDTYPE = 'Cyclotronic Electric Field'
+
     @classmethod
     def getResonanceT(cls, partType: Type[Particle], bField: ConstantUniformBField):
         return 2*PI*partType.getRestMass() / (partType.getCharge()*np.linalg.norm(bField.fieldVector))
@@ -144,12 +169,16 @@ class CyclotronEField(StepOscillatingField, EField):
 
 class ParticleField(Field, ABC):
 
+    FIELDTYPE = 'Particle Field'
+
     def __init__(self, source: Particle, name = ""):
         super(ParticleField, self).__init__(source.getSim(), name)
         self.source = source
 
 
 class ParticleEField(ParticleField, EField, ConstantField):
+
+    FIELDTYPE = 'Particle E-Field'
 
     def getVector(self, point: np.array):
         r = point - self.source.r
@@ -163,6 +192,7 @@ class ParticleEField(ParticleField, EField, ConstantField):
 
 
 class FieldPoint(Trackable):
+
     class Property(TrackableProperty):
         VECTOR = 'Field vector', True
         # POTENTIAL = 'Potential'
@@ -182,3 +212,6 @@ class FieldPoint(Trackable):
 
     def getFullName(self):
         return self.field.getFullName() + ': ' + self.name
+
+    def getTypeName(self):
+        return self.field.getTypeName()

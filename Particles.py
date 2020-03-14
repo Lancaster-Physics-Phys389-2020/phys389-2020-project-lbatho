@@ -5,6 +5,18 @@ from Common import *
 
 class Particle(Trackable, ABC):
 
+    REST_MASS = 0
+    CHARGE = 0
+    PARTICLETYPE = ''
+
+    @classmethod
+    def getRestMass(cls):
+        return cls.REST_MASS
+
+    @classmethod
+    def getCharge(cls):
+        return cls.CHARGE
+
     class Property(TrackableProperty):
         ENERGY = 'Energy', False
         MASS = 'Mass', False
@@ -31,6 +43,12 @@ class Particle(Trackable, ABC):
         self.name = name
         self.ID: int = None
 
+    def __lt__(self, other):
+        if isinstance(other, Particle):
+            return self.name < other.name
+        else:
+            raise TypeError
+
 #    def __repr__(self):
 #        return self.name, self.r, self.v, self.a, self.m, self.q
 
@@ -39,6 +57,9 @@ class Particle(Trackable, ABC):
 
     def getFullName(self):
         return self.name + ' ' + str(self.ID)
+
+    def getTypeName(self):
+        return self.__class__.PARTICLETYPE
 
     #def getFieldIDs(self):
     #    return self.__fieldIDs
@@ -74,16 +95,6 @@ class Particle(Trackable, ABC):
     def getEnergy(self):
         return 0.5*self.m*np.vdot(self.v, self.v) # Temp, non-relativistic
 
-    @classmethod
-    @abstractmethod
-    def getRestMass(cls):
-        pass
-
-    @classmethod
-    @abstractmethod
-    def getCharge(cls):
-        pass
-
     def getProperty(self, p: Property):
         if p is Particle.Property.ENERGY:
             return self.getEnergy()
@@ -105,20 +116,14 @@ class Proton(Particle):
 
     REST_MASS = 938 # Temp value
     CHARGE = 1
+    PARTICLETYPE = 'Proton'
 
     def __init__(self,
                  position = np.array([0, 0, 0], float),
                  velocity = np.array([0, 0, 0], float),
                  acceleration = np.array([0, 0, 0], float)):
-        super(Proton, self).__init__('Proton', position, velocity, acceleration, Proton.REST_MASS, Proton.CHARGE)
-
-    @classmethod
-    def getRestMass(cls):
-        return cls.REST_MASS
-
-    @classmethod
-    def getCharge(cls):
-        return cls.CHARGE
+        super(Proton, self).__init__(position = position, velocity = velocity, acceleration = acceleration,
+                                     mass = Proton.REST_MASS, charge = Proton.CHARGE)
 
 
 class Bunch(Trackable):
@@ -142,6 +147,7 @@ class Bunch(Trackable):
                  acceleration = np.array([0,0,0], float),
                  R = float(0)):
         self.N = N
+        self.partType = partType
         part = partType(position = position, velocity = velocity, acceleration = acceleration)
         self.particles: List[Particle] = [part]
         self.ID = None
@@ -149,7 +155,7 @@ class Bunch(Trackable):
             self.particles.append(deepcopy(part))
 
     def getTypeName(self):
-        return self.particles[0].name
+        return self.particles[0].getTypeName()
 
     def getMomentum(self):
         mv = np.array([0, 0, 0], float)

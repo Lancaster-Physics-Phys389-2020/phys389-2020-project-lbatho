@@ -18,6 +18,7 @@ class Simulation(Trackable, ABC):
         self.approx = approx
         self.name = name
         self.simlog = SimLog(self.__class__.__name__)
+        self.timeLength = timeLength
         self.tickLength = int(timeLength / tStep) + 1
         self.tStep = tStep
         if logStep is None:
@@ -38,7 +39,16 @@ class Simulation(Trackable, ABC):
         self.simlog.start()
         for i in range(self.tickLength):
             self.tick()
+        self.running = False
         log('Done in ' + str((datetime.now() - START_TIME).total_seconds()) + 's')
+        self.simlog.appendMiscData({'Timestep': self.tStep, 'Duration': self.timeLength,
+                                    'Approximation': self.approx.value})
+        p = SimLog.summariseTrackables(self.particles)
+        f = SimLog.summariseTrackables(self.fields)
+        b = {}
+        for i in self.bunches:
+            b.update({'Bunch ' + str(i.ID): str(i.N) + ' ' + i.getTypeName() + 's'})
+        self.simlog.appendEnvData({'Particles': p, 'Fields': f, 'Bunches': b})
         self.post()
 
     @abstractmethod
@@ -124,6 +134,9 @@ class Simulation(Trackable, ABC):
     def getFullName(self):
         return 'System'
 
+    def getTypeName(self):
+        return 'Simulation'
+
     def getProperty(self, p: Property):
         if p is Simulation.Property.TIME:
             return self.getCurrentTime()
@@ -151,9 +164,8 @@ class SingleProtonSimulation(Simulation):
     def post(self):
         print('Done')
         self.simlog.save()
-        df = self.simlog.getData()
-        x, y, z = SimLog.splitArray(df['Proton 0: Position'])
-        plt.plot(x, y)
+        df = self.simlog.getTrackedData()
+        plt.plot(df['Proton 0: Position - x'], df['Proton 0: Position - y'])
         plt.show()
 
 
@@ -176,7 +188,7 @@ class CyclotronSimulation(Simulation):
 
     def post(self):
         self.simlog.save()
-        df = self.simlog.getData()
+        df = self.simlog.getTrackedData()
         x, y, z = SimLog.splitArray(df['Bunch 0: Central Position'])
         plt.plot(x, y)
         plt.show()

@@ -116,6 +116,10 @@ class Trackable(ABC):
     def getFullName(self) -> str:
         pass
 
+    @abstractmethod
+    def getTypeName(self) -> str:
+        pass
+
 
 class SimLog:
 
@@ -130,14 +134,25 @@ class SimLog:
             z.append(i[2])
         return x, y, z
 
+    @classmethod
+    def summariseTrackables(cls, lis: List[Trackable]) -> dict:
+        dic = {}
+        for i in lis:
+            t = i.getTypeName()
+            if dic.get(t) is None:
+                dic.update({t: 1})
+            else:
+                dic.update({t: dic.get(t) + 1})
+        return dic
+
     def __init__(self, name: str):
         self.name = name
-        # self.file = open(name + '_' + START_TIME_STR + '.csv', 'w', newline = '')
         self.columns = []
-        # self.out: csv.DictWriter = None
         self.logging = False
         self.tracked: List[Trackable] = []
         self.rows: List[dict] = []
+        self.miscdata = {}
+        self.envdata = {}
 
     def start(self):
         self.logging = True
@@ -158,8 +173,39 @@ class SimLog:
         # self.file.flush()
         self.rows.append(dic)
 
-    def getData(self):
+    def getTrackedData(self) -> DataFrame:
+        df: DataFrame = self.getRawTrackedData()
+        vec = False
+        for k, v in self.rows[0].items():
+            if isinstance(v, np.ndarray):
+                vec = True
+                break
+        if not vec:
+            return df
+        else:
+            dic = {}
+            for d in list(df):
+                if isinstance(df[d][0], np.ndarray):
+                    x, y, z = self.splitArray(df[d])
+                    dic.update({(d + ' - x'): x, (d + ' - y'): y, (d + ' - z'): z})
+                else:
+                    dic.update({d: df[d]})
+            return DataFrame(dic)
+
+    def getRawTrackedData(self) -> DataFrame:
         return DataFrame(self.rows)
+
+    def appendMiscData(self, data: dict):
+        self.miscdata.update(data)
+
+    def getMiscData(self) -> dict:
+        return self.miscdata
+
+    def appendEnvData(self, data: dict):
+        self.envdata.update(data)
+
+    def getEnvData(self) -> dict:
+        return self.envdata
 
     def save(self, filename: str = None):
         if filename is None:
@@ -177,24 +223,7 @@ class SimLog:
         else:
             file = filename
         log('Dumping simulation data as CSV to ' + file + '... ', endLine = False)
-        df: DataFrame = self.getData()
-        vec = False
-        for k, v in self.rows[0].items():
-            if isinstance(v, np.ndarray):
-                vec = True
-                break
-        if not vec:
-            return df
-        else:
-            dic = {}
-            for d in list(df):
-                if isinstance(df[d][0], np.ndarray):
-                    x, y, z = self.splitArray(df[d])
-                    dic.update({(d + ' - x'): x, (d + ' - y'): y, (d + ' - z'): z})
-                else:
-                    dic.update({d: df[d]})
-            newdf = DataFrame(dic)
-            newdf.to_csv(path_or_buf = file)
+        self.getTrackedData().to_csv(path_or_buf = file)
         log('done')
 
     def __call__(self):
@@ -218,7 +247,9 @@ class ProgramLog:
         self.fname = 'logs/' + name + '.log'
         self.out = open(self.fname, 'w')
 
-    def __call__(self, s, msgtype = MsgType.PRINT, endLine = True):
+    def __call__(self, s = None, msgtype = MsgType.PRINT, endLine = True):
+        if s is None:
+            s = ''
         self.log(s, msgtype, endLine)
 
     def log(self, s, msgtype = MsgType.PRINT, endLine = True):
