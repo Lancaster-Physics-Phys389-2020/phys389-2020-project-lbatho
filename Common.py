@@ -120,6 +120,35 @@ class Trackable(ABC):
     def getTypeName(self) -> str:
         pass
 
+class TrackableObject(Trackable, ABC):
+
+    @abstractmethod
+    def getPosition(self) -> np.ndarray:
+        pass
+
+    @abstractmethod
+    def getVelocity(self) -> np.ndarray:
+        pass
+
+    @abstractmethod
+    def getAcceleration(self) -> np.ndarray:
+        pass
+
+    @abstractmethod
+    def getGamma(self) -> np.ndarray:
+        pass
+
+    @abstractmethod
+    def getMomentum(self) -> np.ndarray:
+        pass
+
+    @abstractmethod
+    def getEnergy(self) -> np.ndarray:
+        pass
+
+    @abstractmethod
+    def getType(self):
+        pass
 
 class SimLog:
 

@@ -2,20 +2,20 @@ from Common import *
 from Fields import *
 from Particles import *
 
-
 class Simulation(Trackable, ABC):
-
     class Property(TrackableProperty):
         TIME = 'Time', False
         ENERGY = 'Total Energy', False
         MOMENTUM = 'Total Momentum', False
         ANGMOMENTUM = 'Total Angular Momentum', False
 
-    def __init__(self, approx : Approximation, name : str, tStep: float, timeLength: float, logStep: float = None):
+    def __init__(self, approx: Approximation, name: str,
+                 tStep: float, timeLength: float, logStep: float = None, relativistic = True):
         log('Created new sim: ' + name)
         log.indent()
         log('Approximation ' + approx.value + ', timestep ' + str(tStep) + ', duration ' + str(timeLength))
         self.approx = approx
+        self.isRelativisitic = relativistic
         self.name = name
         self.simlog = SimLog(self.__class__.__name__)
         self.timeLength = timeLength
@@ -49,6 +49,7 @@ class Simulation(Trackable, ABC):
         for i in self.bunches:
             b.update({'Bunch ' + str(i.ID): str(i.N) + ' ' + i.getTypeName() + 's'})
         self.simlog.appendEnvData({'Particles': p, 'Fields': f, 'Bunches': b})
+        self.simlog.save()
         self.post()
 
     @abstractmethod
@@ -63,7 +64,7 @@ class Simulation(Trackable, ABC):
             log('Adding ' + p.name + ' with ID ' + str(j), ProgramLog.MsgType.ENV)
         return j
 
-    def addBunch(self, b : Bunch):
+    def addBunch(self, b: Bunch):
         ids = []
         j = len(self.bunches)
         b.ID = j
@@ -73,11 +74,12 @@ class Simulation(Trackable, ABC):
         for p in b.particles:
             ids.append(self.addParticle(p, True))
         l = len(ids)
-        log('Added ' + str(l) + ' particles with IDs in range: (' + str(ids[0]) + ', ' + str(ids[l-1]) + ')', ProgramLog.MsgType.ENV)
+        log('Added ' + str(l) + ' particles with IDs in range: (' + str(ids[0]) + ', ' + str(ids[l - 1]) + ')',
+            ProgramLog.MsgType.ENV)
         log.unindent()
         return ids, j
 
-    def addField(self, f : Field):
+    def addField(self, f: Field):
         j = len(self.fields)
         f.ID = j
         self.fields.append(f)
@@ -87,11 +89,11 @@ class Simulation(Trackable, ABC):
     def getCurrentTime(self):
         return self.currentTick * self.tStep
 
-    def getForce(self, part : Particle):
+    def getForce(self, part: Particle):
         totalF = np.array([0, 0, 0], float)
-#        ex = part.getFields()
+        #        ex = part.getFields()
         for f in self.fields:
- #          if f not in ex:
+            #          if f not in ex:
             totalF += f.getForce(part)
         return totalF
 
@@ -100,10 +102,10 @@ class Simulation(Trackable, ABC):
         lg = (self.currentTick % self.tickLog == 0)
         if prnt:
             t = self.getCurrentTime()
-            print(str(np.round(100*self.currentTick/self.tickLength)) + '% done')
+            print(str(np.round(100 * self.currentTick / self.tickLength)) + '% done')
         for p in self.particles:
             p.applyForce(self.getForce(p))
-            p.update(self.tStep, self.approx)
+            p.update(tStep = self.tStep, approx = self.approx, relativistic = self.isRelativisitic)
         if lg:
             self.simlog()
         for p in self.particles:
@@ -116,17 +118,17 @@ class Simulation(Trackable, ABC):
     def getTotalEnergy(self):
         e = float(0)
         for p in self.particles:
-            e += p.getEnergy() #+ p.getPotentialEnergy()
+            e += p.getEnergy()  # + p.getPotentialEnergy()
         return e
 
     def getTotalMomentum(self):
-        mv = np.array([0,0,0], float)
+        mv = np.array([0, 0, 0], float)
         for p in self.particles:
             mv += p.getMomentum()
         return mv
 
     def getTotalAngMomentum(self):
-        tau = np.array([0,0,0], float)
+        tau = np.array([0, 0, 0], float)
         for p in self.particles:
             tau += p.getAngMomentum()
         return tau
@@ -149,46 +151,83 @@ class Simulation(Trackable, ABC):
         else:
             return None
 
-
 class SingleProtonSimulation(Simulation):
 
-    def __init__(self, approx : Approximation, tStep: float, timeLength: float, logStep: float = None):
-        super(SingleProtonSimulation, self).__init__(approx = approx, name = 'Single Proton in Constant Uniform B-Field',
-                                                     tStep = tStep, timeLength =  timeLength, logStep = logStep)
-        #self.addField(ConstantUniformBField(fieldVector = np.array([0, 0, 1000], float)))
-        pro = Proton(velocity = np.array([1,0,0], float))
+    def __init__(self, approx: Approximation, tStep: float, timeLength: float, logStep: float = None):
+        super(SingleProtonSimulation, self).__init__(approx = approx,
+                                                     name = 'Single Proton in Constant Uniform B-Field',
+                                                     tStep = tStep, timeLength = timeLength, logStep = logStep)
+        # self.addField(ConstantUniformBField(fieldVector = np.array([0, 0, 1000], float)))
+        pro = Proton(velocity = np.array([1, 0, 0], float))
         self.addParticle(pro)
-        self.simlog.track(self, Simulation.Property.TIME, Simulation.Property.ENERGY, Simulation.Property.MOMENTUM, Simulation.Property.ANGMOMENTUM)
+        self.simlog.track(self, Simulation.Property.TIME, Simulation.Property.ENERGY, Simulation.Property.MOMENTUM,
+                          Simulation.Property.ANGMOMENTUM)
         self.simlog.track(pro, Particle.Property.POS)
 
     def post(self):
-        print('Done')
-        self.simlog.save()
-        df = self.simlog.getTrackedData()
-        plt.plot(df['Proton 0: Position - x'], df['Proton 0: Position - y'])
-        plt.show()
+        pass
 
 
 class CyclotronSimulation(Simulation):
 
     def __init__(self, approx: Approximation, tStep: float, timeLength: float, logStep: float = None,
                  part: Type[Particle] = Proton, nBunch: int = 1, nPerBunch: int = 10):
-        super(CyclotronSimulation, self).__init__(approx = approx, tStep = tStep, timeLength = timeLength,
+        super(CyclotronSimulation, self).__init__(approx = approx, relativistic = True,
+                                                  tStep = tStep, timeLength = timeLength,
                                                   logStep = logStep, name = part.__name__ + ' Cyclotron')
         self.simlog.track(self, Simulation.Property.TIME)
-        for i in range(nBunch):
-            b = Bunch(partType = part, N = nPerBunch, velocity = np.array([1,0,0], float))
-            self.addBunch(b)
-            self.simlog.track(b, Bunch.Property.POS)
-        bf = ConstantUniformBField(np.array([0,0,1000]))
+        b = Bunch(partType = part, N = nPerBunch, velocity = np.array([0.1, 0, 0], float))
+        self.addBunch(b)
+        self.simlog.track(b, Bunch.Property.POS, Bunch.Property.VEL, Bunch.Property.GAMMA)
+        bf = ConstantUniformBField(np.array([0, 0, 1000]))
         self.addField(bf)
         r = AxisRegion(-5, 5, Axis.X)
-        c = CyclotronEField(fieldVector = np.array([1000,0,0], float), partType = part, bField = bf, tStep = tStep, region = r)
+        c = CyclotronEField(fieldVector = np.array([100, 0, 0], float), partType = part, bField = bf, tStep = tStep,
+                            region = r)
         self.addField(c)
 
     def post(self):
-        self.simlog.save()
-        df = self.simlog.getTrackedData()
-        x, y, z = SimLog.splitArray(df['Bunch 0: Central Position'])
-        plt.plot(x, y)
-        plt.show()
+        pass
+
+class SynchroCyclotronSimulation(Simulation):
+
+    def __init__(self, approx: Approximation, tStep: float, timeLength: float, logStep: float = None,
+                 part: Type[Particle] = Proton, nBunch: int = 1, nPerBunch: int = 10):
+        super(SynchroCyclotronSimulation, self).__init__(approx = approx, relativistic = True,
+                                                         tStep = tStep, timeLength = timeLength,
+                                                         logStep = logStep, name = part.__name__ + ' Synchrocyclotron')
+        self.simlog.track(self, Simulation.Property.TIME)
+        b = Bunch(partType = part, N = nPerBunch, velocity = np.array([0.1, 0, 0], float))
+        self.addBunch(b)
+        self.simlog.track(b, Bunch.Property.POS, Bunch.Property.VEL, Bunch.Property.GAMMA)
+        bf = ConstantUniformBField(np.array([0, 0, 1000]))
+        self.addField(bf)
+        r = AxisRegion(-5, 5, Axis.X)
+        c = SynchroCyclotronEField(fieldVector = np.array([100, 0, 0], float), referenceObject = b, bField = bf,
+                                   tStep = tStep, region = r)
+        self.addField(c)
+
+    def post(self):
+        pass
+
+class IsoCyclotronSimulation(Simulation):
+
+    def __init__(self, approx: Approximation, tStep: float, timeLength: float, logStep: float = None,
+                 part: Type[Particle] = Proton, nBunch: int = 1, nPerBunch: int = 10):
+        super(IsoCyclotronSimulation, self).__init__(approx = approx, relativistic = True,
+                                                     tStep = tStep, timeLength = timeLength,
+                                                     logStep = logStep,
+                                                     name = part.__name__ + ' Isosynchronous Cyclotron')
+        self.simlog.track(self, Simulation.Property.TIME)
+        b = Bunch(partType = part, N = nPerBunch, velocity = np.array([0.1, 0, 0], float))
+        self.addBunch(b)
+        self.simlog.track(b, Bunch.Property.POS, Bunch.Property.VEL, Bunch.Property.GAMMA)
+        bf = IsoCyclotronBField(fieldVector = np.array([0, 0, 1000]), referenceObject = b)
+        self.addField(bf)
+        r = AxisRegion(-5, 5, Axis.X)
+        c = CyclotronEField(fieldVector = np.array([10, 0, 0], float), partType = part, bField = bf,
+                            tStep = tStep, region = r)
+        self.addField(c)
+
+    def post(self):
+        pass
